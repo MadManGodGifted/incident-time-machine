@@ -1,0 +1,20 @@
+# Incident Time Machine - Dependencies
+
+# Core Engine Runtime Dependencies:
+# Zero external packages required.
+# The deterministic engine is built 100% on Python 3.11+ standard library:
+#   - dataclasses (type-safe data models)
+#   - datetime (ISO 8601 parsing and UTC normalization)
+#   - json (fixture ingestion and serialization)
+#   - enum (log level taxonomy)
+#   - typing (strict type annotations)
+
+# Agent Framework & Tool Integration:
+strands-agents>=1.62.0
+
+# Optional Model Provider Dependencies:
+# - Google Gemini: google-genai (requires GEMINI_API_KEY or GOOGLE_API_KEY)
+# - Amazon Bedrock: boto3 (installed via strands-agents, requires AWS credentials)
+
+# Development & Test Suite Dependencies:
+pytest>=8.0.0

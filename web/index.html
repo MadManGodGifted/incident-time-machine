@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Incident Time Machine // Forensic Command Center</title>
+  <!-- Clean Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="cream-theme">
+  <!-- Event Detail Modal Drawer -->
+  <div id="event-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-panel card spotlight-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="sys-badge font-mono" id="modal-event-id">[EVT-0000]</span>
+          <h3 id="modal-event-service" class="font-display">service-name</h3>
+        </div>
+        <button id="modal-close" class="modal-close-btn" aria-label="Close modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-meta-grid">
+          <div class="meta-item">
+            <span class="meta-label">TIMESTAMP (UTC)</span>
+            <span class="meta-val font-mono" id="modal-event-time">--</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">SEVERITY LEVEL</span>
+            <span class="meta-val font-mono" id="modal-event-level">--</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">REQUEST CORRELATION</span>
+            <span class="meta-val font-mono" id="modal-event-req">--</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">CHRONO INDEX</span>
+            <span class="meta-val font-mono" id="modal-event-idx">--</span>
+          </div>
+        </div>
+        <div class="modal-payload-group">
+          <span class="meta-label">RAW LOG MESSAGE (UNTRUSTED DATA)</span>
+          <pre class="code-block" id="modal-event-msg"></pre>
+        </div>
+        <div class="modal-payload-group">
+          <span class="meta-label">FULL EVENT JSON</span>
+          <pre class="code-block" id="modal-event-json"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Master App Container -->
+  <div class="app-container">
+    <!-- Top Command-Center Header -->
+    <header class="mission-header">
+      <div class="header-left">
+        <div class="pulse-beacon" aria-hidden="true">
+          <div class="beacon-wave"></div>
+          <div class="beacon-core"></div>
+        </div>
+        <div class="brand-block">
+          <div class="brand-topline">
+            <span class="brand-callsign font-mono">SYS.CMD // 09-AWS</span>
+            <span class="brand-divider">/</span>
+            <span class="brand-mode-badge font-mono" id="brand-mode-label">LOCAL ENGINE ACTIVE</span>
+          </div>
+          <h1 class="brand-title">Incident Time Machine</h1>
+          <p class="brand-subtitle">Deterministic Distributed-Log Reconstruction Engine</p>
+        </div>
+      </div>
+
+      <!-- Center Mission Telemetry Readouts -->
+      <div class="telemetry-readouts" aria-label="Telemetry HUD">
+        <div class="hud-item">
+          <span class="hud-label">WALL TIME (UTC)</span>
+          <span class="hud-val font-mono" id="hud-clock">--:--:--.-- UTC</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">AWS REGION</span>
+          <span class="hud-val font-mono text-cyan" id="hud-region">ap-southeast-2</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">CLOUD TARGET</span>
+          <span class="hud-val font-mono text-purple" id="hud-lambda">incident-time-machine</span>
+        </div>
+      </div>
+
+      <!-- Right Command Controls -->
+      <div class="header-right">
+        <!-- Mode Toggle Switch (React Bits Sliding Switch Style) -->
+        <div class="engine-switch" role="group" aria-label="Engine Execution Selector">
+          <button id="mode-local" class="switch-btn active" data-mode="local">
+            <span class="led led-green"></span> LOCAL
+          </button>
+          <button id="mode-remote" class="switch-btn" data-mode="remote">
+            <span class="led led-cyan"></span> AWS LAMBDA
+          </button>
+        </div>
+
+        <!-- System Connection Pill -->
+        <div id="connection-status" class="hud-status status-healthy" title="Bridge Status">
+          <span class="status-indicator"></span>
+          <span id="connection-text" class="font-mono">BRIDGE READY</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sub-header Technical Ribbon -->
+    <div class="mission-substrip font-mono">
+      <div class="substrip-left">
+        <span class="bracket">[</span> SEC-LEVEL: FORENSIC <span class="bracket">]</span>
+        <span class="dot-sep">•</span>
+        <span class="bracket">[</span> PROTOCOL: DETERMINISTIC_UTC <span class="bracket">]</span>
+        <span class="dot-sep">•</span>
+        <span class="bracket">[</span> EVIDENCE: STRICT_CITATION <span class="bracket">]</span>
+      </div>
+      <div class="substrip-right">
+        <span id="investigation-status">STANDBY // READY FOR INGESTION</span>
+      </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <main class="main-layout">
+      <!-- Control Deck -->
+      <section class="controls-panel card spotlight-card">
+        <div class="panel-corner tl">+</div>
+        <div class="panel-corner tr">+</div>
+        <div class="panel-corner bl">+</div>
+        <div class="panel-corner br">+</div>
+
+        <div class="control-row">
+          <div class="control-group fixture-group">
+            <label for="fixture-select" class="control-label font-mono">
+              <span class="label-idx">01</span> SELECT INCIDENT LOG FIXTURE
+            </label>
+            <div class="select-wrapper">
+              <select id="fixture-select" class="custom-select font-mono">
+                <option value="" disabled selected>Querying available log streams...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group actions-group">
+            <!-- 21st.dev Shiny Button -->
+            <button id="btn-analyze" class="btn-shiny">
+              <span class="shiny-shimmer"></span>
+              <span class="btn-icon">⚡</span>
+              <span class="btn-text font-display">RECONSTRUCT TIMELINE</span>
+            </button>
+            <button id="btn-refresh" class="btn-icon-terminal" title="Reload System Status & Fixtures">
+              ↻
+            </button>
+          </div>
+        </div>
+
+        <div class="deck-footer">
+          <div class="tech-tag font-mono">INVARIANT GUARANTEE</div>
+          <p class="deck-notice">
+            Logs are treated as untrusted data. Timeline sorting is mathematically deterministic. 
+            <strong>Chronological priority does NOT establish causation.</strong>
+          </p>
+        </div>
+      </section>
+
+      <!-- Mission Metric HUD (React Bits Rolling Number Animation) -->
+      <section class="metrics-ribbon">
+        <div class="metric-card card spotlight-card">
+          <div class="metric-header">
+            <span class="metric-tag font-mono">TOTAL_EVENTS</span>
+            <span class="metric-sub-label font-mono">INGESTED</span>
+          </div>
+          <div id="stat-events" class="metric-value font-mono rolling-num">--</div>
+          <div class="metric-footer font-mono">Microsecond UTC ordered</div>
+        </div>
+
+        <div class="metric-card card spotlight-card">
+          <div class="metric-header">
+            <span class="metric-tag font-mono text-amber">EARLIEST_ERROR</span>
+            <span class="metric-sub-label font-mono">FIRST RECORDED</span>
+          </div>
+          <div id="stat-earliest-service" class="metric-value font-mono text-amber">--</div>
+          <div id="stat-earliest-id" class="metric-footer font-mono">No errors detected</div>
+        </div>
+
+        <div class="metric-card card spotlight-card">
+          <div class="metric-header">
+            <span class="metric-tag font-mono text-cyan">CORRELATED_TRACES</span>
+            <span class="metric-sub-label font-mono">REQUEST_IDS</span>
+          </div>
+          <div id="stat-traces" class="metric-value font-mono text-cyan rolling-num">--</div>
+          <div class="metric-footer font-mono">Cross-service propagations</div>
+        </div>
+
+        <div class="metric-card card spotlight-card">
+          <div class="metric-header">
+            <span class="metric-tag font-mono text-purple">TELEMETRY_GAPS</span>
+            <span class="metric-sub-label font-mono">UNKNOWNS</span>
+          </div>
+          <div id="stat-unknowns" class="metric-value font-mono text-purple rolling-num">--</div>
+          <div class="metric-footer font-mono">Explicit missing dimensions</div>
+        </div>
+      </section>
+
+      <!-- Alert / Diagnostics Banner -->
+      <div id="alert-banner" class="alert-banner hidden"></div>
+
+      <!-- Real Loading Animation -->
+      <div id="loading-state" class="loading-state hidden">
+        <div class="loading-pulse-ring">
+          <div class="ring-core"></div>
+        </div>
+        <div class="loading-readout">
+          <p id="loading-text" class="font-mono">RECONSTRUCTING INCIDENT TIMELINE VIA ENGINE...</p>
+          <span class="loading-sub font-mono">Sorting ISO 8601 timestamps & correlating request traces</span>
+        </div>
+      </div>
+
+      <!-- Anti-Causation Disclaimer Card with Border Beam Animation -->
+      <section id="causation-disclaimer-box" class="disclaimer-card card border-beam-card hidden">
+        <div class="disclaimer-hazard-strip"></div>
+        <div class="disclaimer-content">
+          <div class="disclaimer-title-row">
+            <span class="hazard-icon">⚠</span>
+            <h3 class="disclaimer-title font-display">ANALYTICAL INVARIANT: TEMPORAL PRECEDENCE ≠ ROOT CAUSE</h3>
+            <span class="fallacy-tag font-mono">[POST HOC ERGO PROPTER HOC]</span>
+          </div>
+          <p id="causation-disclaimer-body" class="disclaimer-body">
+            Earliest recorded error manifested in <code>inventory-service</code> (<code>evt-0005</code>). 
+            Chronological sequence does NOT prove root cause; it may merely be a downstream symptom of silent dependency saturation, unlogged network drops, or pre-existing infrastructure lockups.
+          </p>
+        </div>
+      </section>
+
+      <!-- Interactive Service Topology Radar (React Bits Particle / Node Constellation) -->
+      <section class="card topology-card spotlight-card">
+        <div class="card-header">
+          <div class="header-left-group">
+            <span class="card-num font-mono">SEC.02</span>
+            <div>
+              <h2 class="card-title font-display">Distributed System Topology Radar</h2>
+              <p class="card-subtitle">Real-time observed service graph & trace activation status</p>
+            </div>
+          </div>
+          <div class="topology-legend font-mono">
+            <span class="legend-item"><span class="legend-dot green"></span> Healthy</span>
+            <span class="legend-item"><span class="legend-dot red"></span> Error Observed</span>
+            <span class="legend-item"><span class="legend-dot orange"></span> Telemetry Pulse</span>
+          </div>
+        </div>
+        <div class="topology-canvas-container" id="topology-container">
+          <canvas id="topology-canvas" class="topology-canvas"></canvas>
+          <div class="topology-hud-overlay font-mono">
+            <div id="topology-status-readout">SYSTEM RADAR: STANDBY // MOUSE HOVER FOR INTERACTION</div>
+            <div class="radar-coords">COORDINATES: 34.02°S / 151.20°E [SYDNEY-AP-SOUTHEAST-2]</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Dual Column Forensics Grid -->
+      <div class="forensics-grid">
+        <!-- Left Column: Chronological Event Timeline -->
+        <section class="card timeline-section spotlight-card">
+          <div class="card-header">
+            <div class="header-left-group">
+              <span class="card-num font-mono">SEC.03</span>
+              <div>
+                <h2 class="card-title font-display">Chronological Event Timeline</h2>
+                <p class="card-subtitle">Microsecond-precision timestamp sequencing & stable IDs</p>
+              </div>
+            </div>
+            <!-- Severity Filter Pills -->
+            <div class="filter-pills font-mono">
+              <button class="pill active" data-filter="all">ALL</button>
+              <button class="pill pill-err" data-filter="ERROR">ERROR</button>
+              <button class="pill pill-warn" data-filter="WARN">WARN</button>
+              <button class="pill pill-info" data-filter="INFO">INFO</button>
+            </div>
+          </div>
+
+          <div id="timeline-list" class="timeline-list">
+            <div class="empty-state">
+              <div class="empty-crosshair font-mono">+</div>
+              <p class="font-mono">AWAITING LOG INGESTION</p>
+              <span class="empty-sub">Select an incident fixture above and click RECONSTRUCT TIMELINE to populate forensics.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right Column: Traces, Hypotheses & Unknowns -->
+        <div class="details-column">
+          <!-- Distributed Trace Waterfall -->
+          <section class="card trace-section spotlight-card">
+            <div class="card-header">
+              <div class="header-left-group">
+                <span class="card-num font-mono">SEC.04</span>
+                <div>
+                  <h2 class="card-title font-display">Distributed Trace Waterfall</h2>
+                  <p class="card-subtitle">Request propagation flows correlated by request_id</p>
+                </div>
+              </div>
+            </div>
+            <div id="traces-list" class="traces-list">
+              <div class="empty-state">
+                <p class="font-mono">NO ACTIVE TRACES</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Evidence-Backed Hypotheses -->
+          <section class="card hypotheses-section spotlight-card">
+            <div class="card-header">
+              <div class="header-left-group">
+                <span class="card-num font-mono">SEC.05</span>
+                <div>
+                  <h2 class="card-title font-display">Evidence-Backed Hypotheses</h2>
+                  <p class="card-subtitle">Deterministic claims referencing verified event IDs</p>
+                </div>
+              </div>
+            </div>
+            <div id="hypotheses-list" class="hypotheses-list">
+              <div class="empty-state">
+                <p class="font-mono">NO HYPOTHESES FORMULATED</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Telemetry Gaps & Unknowns -->
+          <section class="card unknowns-section spotlight-card">
+            <div class="card-header">
+              <div class="header-left-group">
+                <span class="card-num font-mono">SEC.06</span>
+                <div>
+                  <h2 class="card-title font-display">Telemetry Gaps & Unknowns</h2>
+                  <p class="card-subtitle">Explicit unmonitored boundaries & absence of evidence</p>
+                </div>
+              </div>
+            </div>
+            <div id="unknowns-list" class="unknowns-list">
+              <div class="empty-state">
+                <p class="font-mono">NO BOUNDARIES IDENTIFIED</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bottom Mission Terminal Footer -->
+    <footer class="mission-footer font-mono">
+      <div class="footer-block">
+        <span class="status-indicator-sm"></span>
+        <span>KERNEL: ITM-DETERMINISTIC-v1.0</span>
+        <span class="footer-sep">|</span>
+        <span>LAMBDA: <code>incident-time-machine</code></span>
+        <span class="footer-sep">|</span>
+        <span>REGION: <code>ap-southeast-2</code></span>
+      </div>
+      <div class="footer-block text-dim">
+        <span>AWS AGENT-TOOL FORENSICS PLATFORM // DETERMINISTIC ENGINE</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

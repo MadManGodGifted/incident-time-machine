@@ -1,0 +1,58 @@
+[
+  {
+    "timestamp": "2026-10-25T08:10:02.100Z",
+    "service": "auth-service",
+    "level": "INFO",
+    "message": "Token validated successfully for user_id=usr_1001",
+    "request_id": "req-hlth-001",
+    "metadata": {"auth_provider": "jwt-rsa"}
+  },
+  {
+    "timestamp": "2026-10-25T08:10:00.000Z",
+    "service": "api-gateway",
+    "level": "INFO",
+    "message": "Incoming GET /products/104 from 10.0.1.20",
+    "request_id": "req-hlth-001",
+    "metadata": {"path": "/products/104"}
+  },
+  {
+    "timestamp": "2026-10-25T08:10:05.400Z",
+    "service": "api-gateway",
+    "level": "INFO",
+    "message": "HTTP 200 OK returned to client (latency=5400ms)",
+    "request_id": "req-hlth-001",
+    "metadata": {"http_status": 200}
+  },
+  {
+    "timestamp": "2026-10-25T08:10:03.200Z",
+    "service": "inventory-service",
+    "level": "DEBUG",
+    "message": "Cache hit for product_id=104, stock=42",
+    "request_id": "req-hlth-001",
+    "metadata": {"cache": "redis", "ttl_remaining": 240}
+  },
+  {
+    "timestamp": "2026-10-25T08:10:10.000Z",
+    "service": "api-gateway",
+    "level": "INFO",
+    "message": "Incoming GET /health from ALB",
+    "request_id": "req-hlth-002",
+    "metadata": {"path": "/health"}
+  },
+  {
+    "timestamp": "2026-10-25T08:10:10.015Z",
+    "service": "api-gateway",
+    "level": "INFO",
+    "message": "HTTP 200 OK returned for /health",
+    "request_id": "req-hlth-002",
+    "metadata": {"http_status": 200}
+  },
+  {
+    "timestamp": "2026-10-25T08:10:12.000Z",
+    "service": "cron-worker",
+    "level": "INFO",
+    "message": "Cache warm-up routine completed successfully",
+    "request_id": null,
+    "metadata": {"keys_warmed": 128}
+  }
+]
