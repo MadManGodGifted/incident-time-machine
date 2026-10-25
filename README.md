@@ -1,8 +1,6 @@
-# Incident Time Machine (Local Python MVP)
+# Incident Time Machine
 
-> A deterministic log-reconstruction and incident-analysis engine designed for agentic root-cause investigation in distributed systems.
-
-Built for the AWS Agent-Tool Hackathon as the foundation for autonomous incident triage tools.
+> A deterministic log-reconstruction and incident-forensics engine designed for autonomous root-cause investigation in distributed systems.
 
 ---
 
@@ -93,7 +91,7 @@ Both the deterministic engine and the AWS Lambda handler are built 100% on the P
 
 ## 4. Usage & Execution Commands
 
-### A. Interactive Web Dashboard (Recommended for Hackathon Demo)
+### A. Interactive Web Dashboard
 Start the local dashboard server:
 ```bash
 python -m src.incident_time_machine.server
@@ -198,11 +196,3 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment instructions:
 - **Memory**: `256 MB`
 - **Timeout**: `30 seconds`
 - **Architecture**: `arm64` (Graviton) or `x86_64`
-
----
-
-## 6. Next Steps (Hackathon Roadmap)
-
-- [ ] **Agent Tool Interface**: Wrap the engine as a callable tool for LLM agents (Claude / Bedrock / Gemini).
-- [ ] **AWS CloudWatch Ingestion**: Stream real CloudWatch Logs via boto3 into the engine.
-- [ ] **Strands Integration**: Orchestrate multi-step incident triage workflows.

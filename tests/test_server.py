@@ -201,3 +201,63 @@ def test_post_analyze_remote_mode_success(mock_remote_call, running_server):
         assert call_kwargs["fixture_name"] == "incident_out_of_order.json"
         assert call_kwargs["function_name"] == "incident-time-machine"
         assert call_kwargs["region_name"] == "ap-southeast-2"
+
+
+def test_cors_preflight_options(running_server):
+    """Verify OPTIONS preflight request returns 204 No Content with security headers."""
+    req = urllib.request.Request(
+        f"{running_server}/api/analyze",
+        headers={"Origin": "https://incident-time-machine.vercel.app"},
+        method="OPTIONS",
+    )
+    with urllib.request.urlopen(req) as response:
+        assert response.status == 204
+        assert response.headers.get("Access-Control-Allow-Origin") == "https://incident-time-machine.vercel.app"
+        assert "POST" in response.headers.get("Access-Control-Allow-Methods", "")
+        assert "Content-Type" in response.headers.get("Access-Control-Allow-Headers", "")
+
+
+def test_post_analyze_token_auth_enforcement(running_server):
+    """Verify ITM_ACCESS_TOKEN enforces Bearer/x-api-key authentication when configured."""
+    payload = json.dumps({"mode": "local", "fixture": "healthy_traffic.json"}).encode("utf-8")
+
+    with patch.dict("os.environ", {"ITM_ACCESS_TOKEN": "itm-prod-token-12345"}):
+        # 1. Unauthenticated request should fail with 401 Unauthorized
+        unauth_req = urllib.request.Request(
+            f"{running_server}/api/analyze",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(unauth_req)
+        assert exc_info.value.code == 401
+        err_body = json.loads(exc_info.value.read().decode("utf-8"))
+        assert err_body["error_code"] == "UNAUTHORIZED"
+
+        # 2. Authenticated request with Bearer token succeeds with 200 OK
+        bearer_req = urllib.request.Request(
+            f"{running_server}/api/analyze",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer itm-prod-token-12345",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(bearer_req) as response:
+            assert response.status == 200
+
+        # 3. Authenticated request with x-api-key header succeeds with 200 OK
+        apikey_req = urllib.request.Request(
+            f"{running_server}/api/analyze",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": "itm-prod-token-12345",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(apikey_req) as response:
+            assert response.status == 200
+

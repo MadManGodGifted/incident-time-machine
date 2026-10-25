@@ -7,12 +7,15 @@ Exclusively binds to 127.0.0.1 to guarantee zero external exposure of AWS creden
 from __future__ import annotations
 
 import argparse
+from collections import defaultdict
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
 import sys
+import threading
+import time
 from typing import Any, Dict, List, Optional
 import urllib.parse
 
@@ -25,6 +28,26 @@ WEB_DIR = Path(__file__).resolve().parent.parent.parent / "web"
 
 # Maximum request body size (1 MB limit prevents memory saturation)
 MAX_REQUEST_BYTES = 1024 * 1024
+
+# Rate limiting (sliding window per client IP)
+_RATE_LIMIT_WINDOW_SEC = 60.0
+_MAX_REQUESTS_PER_WINDOW = 60
+_request_timestamps: Dict[str, List[float]] = defaultdict(list)
+_rate_limit_lock = threading.Lock()
+
+
+def _check_rate_limit(client_ip: str) -> bool:
+    """Sliding window rate-limiter per client IP address."""
+    now = time.time()
+    with _rate_limit_lock:
+        history = _request_timestamps[client_ip]
+        history = [t for t in history if now - t < _RATE_LIMIT_WINDOW_SEC]
+        if len(history) >= _MAX_REQUESTS_PER_WINDOW:
+            _request_timestamps[client_ip] = history
+            return True
+        history.append(now)
+        _request_timestamps[client_ip] = history
+        return False
 
 
 def is_aws_credentials_configured() -> bool:
@@ -50,6 +73,24 @@ class IncidentTimeMachineHandler(SimpleHTTPRequestHandler):
         """Override default logging to provide clean, unprivileged console logs without secrets."""
         sys.stderr.write(f"[ITM-Server] {self.address_string()} - {format % args}\n")
 
+    def _is_authorized(self) -> bool:
+        """Check whether incoming request possesses valid authorization if ITM_ACCESS_TOKEN is configured."""
+        required_token = os.environ.get("ITM_ACCESS_TOKEN")
+        if not required_token:
+            return True  # Open access when no access token configured
+
+        auth_header = self.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            if token == required_token:
+                return True
+
+        api_key = self.headers.get("x-api-key", "").strip()
+        if api_key and api_key == required_token:
+            return True
+
+        return False
+
     def _send_json_response(self, status_code: int, data: Dict[str, Any]) -> None:
         """Helper to send standardized JSON responses with security headers."""
         encoded = json.dumps(data, indent=2).encode("utf-8")
@@ -58,18 +99,22 @@ class IncidentTimeMachineHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(encoded)))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1")
+        req_origin = self.headers.get("Origin")
+        allow_origin = req_origin if req_origin else "*"
+        self.send_header("Access-Control-Allow-Origin", allow_origin)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-api-key")
         self.end_headers()
         self.wfile.write(encoded)
 
     def do_OPTIONS(self) -> None:
-        """Handle CORS pre-flight requests from local browser."""
+        """Handle CORS pre-flight requests from browser."""
+        req_origin = self.headers.get("Origin")
+        allow_origin = req_origin if req_origin else "*"
         self.send_response(HTTPStatus.NO_CONTENT)
-        self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1")
+        self.send_header("Access-Control-Allow-Origin", allow_origin)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-api-key")
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -152,6 +197,31 @@ class IncidentTimeMachineHandler(SimpleHTTPRequestHandler):
 
     def _handle_api_analyze(self) -> None:
         """POST /api/analyze - Execute deterministic incident reconstruction (local or remote)."""
+        client_ip = self.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (
+            self.client_address[0] if hasattr(self, "client_address") else "127.0.0.1"
+        )
+        if _check_rate_limit(client_ip):
+            self._send_json_response(
+                HTTPStatus.TOO_MANY_REQUESTS,
+                {
+                    "status": "error",
+                    "error_code": "RATE_LIMITED",
+                    "message": "Too many requests. Please wait before submitting more analyses.",
+                },
+            )
+            return
+
+        if not self._is_authorized():
+            self._send_json_response(
+                HTTPStatus.UNAUTHORIZED,
+                {
+                    "status": "error",
+                    "error_code": "UNAUTHORIZED",
+                    "message": "Authorization required: provide valid Bearer token or x-api-key header.",
+                },
+            )
+            return
+
         content_length_str = self.headers.get("Content-Length")
         if not content_length_str:
             self._send_json_response(

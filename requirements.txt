@@ -9,6 +9,9 @@
 #   - enum (log level taxonomy)
 #   - typing (strict type annotations)
 
+# AWS SDK for Remote Lambda Tool:
+boto3>=1.34.0
+
 # Agent Framework & Tool Integration:
 strands-agents>=1.62.0
 

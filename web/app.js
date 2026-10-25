@@ -165,12 +165,15 @@
   }
 
   // =========================================================================
-  // API Integration
+  // API Integration (Configurable API Base Path)
   // =========================================================================
+
+  const metaApiBase = document.querySelector('meta[name="api-base"]')?.getAttribute("content");
+  const API_BASE = (window.API_BASE_URL || metaApiBase || "").replace(/\/+$/, "");
 
   async function fetchSystemStatus() {
     try {
-      const res = await fetch("/api/status");
+      const res = await fetch(`${API_BASE}/api/status`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -189,13 +192,13 @@
       connectionStatus.className = "hud-status";
       connectionText.textContent = "BRIDGE OFFLINE";
       if (investigationStatus) investigationStatus.textContent = "OFFLINE // START SERVER";
-      showAlert("error", `Cannot connect to local bridge server: ${err.message}. Run: python -m src.incident_time_machine.server`);
+      showAlert("error", `Cannot connect to incident bridge: ${err.message}. If running locally, start server: python -m src.incident_time_machine.server`);
     }
   }
 
   async function loadFixtures() {
     try {
-      const res = await fetch("/api/fixtures");
+      const res = await fetch(`${API_BASE}/api/fixtures`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -232,7 +235,7 @@
     }
 
     try {
-      const res = await fetch("/api/analyze", {
+      const res = await fetch(`${API_BASE}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: currentMode, fixture: selectedFixture }),
